@@ -1,0 +1,71 @@
+# Archivos de Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Entornos virtuales
+venv/
+env/
+ENV/
+.venv/
+.env/
+
+# Archivos del sistema
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Archivos de imágenes originales (pueden contener información sensible)
+to_process/*
+!to_process/.gitignore
+
+# Archivos OCR extraídos (pueden contener información sensible)
+ocr/*
+!ocr/.gitignore
+
+# Archivos Excel/CSV generados (pueden contener información sensible)
+processed/*
+!processed/.gitignore
+
+# Archivos temporales
+*.tmp
+*.temp
+*~
+
+# Archivos de configuración local
+exchange_rates.properties
+
+# Logs
+*.log
+
+# Archivos de respaldo
+*.bak
+*.backup
+
+# Archivos de VS Code
+.vscode/
+
+# Archivos de PyCharm
+.idea/

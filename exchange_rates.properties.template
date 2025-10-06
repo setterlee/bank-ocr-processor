@@ -1,0 +1,13 @@
+# Configuración de tasas de cambio - PLANTILLA
+# Copie este archivo a 'exchange_rates.properties' y ajuste la tasa
+
+# Tasa de cambio USD a CLP (pesos chilenos)
+# Actualizar diariamente según el tipo de cambio del día
+USD_TO_CLP=950
+
+# Ejemplo de uso:
+# - Si la tasa del día es 920, cambiar a: USD_TO_CLP=920
+# - Si la tasa del día es 980, cambiar a: USD_TO_CLP=980
+# 
+# Fuente recomendada: Banco Central de Chile
+# https://www.bcentral.cl/
