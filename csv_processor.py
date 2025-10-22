@@ -25,6 +25,9 @@ class ExcelBankProcessor:
         # Cargar tasa de cambio
         self.usd_to_clp = self.load_exchange_rate()
         
+        # Cargar reglas de categorización
+        self.categorization_rules = self.load_categorization_rules()
+        
         # Crear carpetas si no existen
         self.output_folder.mkdir(exist_ok=True)
         self.debug_folder.mkdir(exist_ok=True)
@@ -52,6 +55,74 @@ class ExcelBankProcessor:
         except Exception as e:
             print(f"⚠️  Error leyendo tasa de cambio: {e}, usando tasa por defecto: 950")
             return 950
+    
+    def load_categorization_rules(self):
+        """Carga las reglas de categorización desde el archivo properties."""
+        rules_file = self.workspace / "categorization_rules.properties"
+        rules = {}
+        
+        if not rules_file.exists():
+            print("⚠️  Archivo categorization_rules.properties no encontrado, categorización deshabilitada")
+            return rules
+        
+        try:
+            with open(rules_file, 'r', encoding='utf-8') as f:
+                for line_num, line in enumerate(f, 1):
+                    line = line.strip()
+                    
+                    # Ignorar líneas vacías y comentarios
+                    if not line or line.startswith('#'):
+                        continue
+                    
+                    # Buscar formato PATRON=CATEGORIA
+                    if '=' in line:
+                        pattern, category = line.split('=', 1)
+                        pattern = pattern.strip().upper()  # Normalizar a mayúsculas
+                        category = category.strip()
+                        
+                        # Validar que la categoría sea una de las permitidas
+                        valid_categories = {
+                            'Transporte', 'Comida', 'Medicinas', 'Servicios', 'Otros', 
+                            'Ingresos', 'Autos', 'N/A', 'TAG', 'sTechSolutions', 
+                            'Extras', 'Restaurantes', 'Venezuela', 'Creditos', 
+                            'Arreglos', 'Ahorros', 'Pediatria SpA'
+                        }
+                        
+                        if category in valid_categories:
+                            rules[pattern] = category
+                        else:
+                            print(f"⚠️  Línea {line_num}: Categoría '{category}' no válida, ignorada")
+                    else:
+                        print(f"⚠️  Línea {line_num}: Formato incorrecto, esperado PATRON=CATEGORIA")
+            
+            print(f"📋 Cargadas {len(rules)} reglas de categorización")
+            return rules
+            
+        except Exception as e:
+            print(f"⚠️  Error leyendo reglas de categorización: {e}")
+            return {}
+    
+    def categorize_movement(self, description):
+        """Categoriza un movimiento basado en su descripción."""
+        if not self.categorization_rules:
+            return ''  # Sin categoría si no hay reglas
+        
+        # Normalizar descripción a mayúsculas para búsqueda case-insensitive
+        description_upper = description.upper()
+        
+        # Buscar patrones que coincidan y tomar el más largo (más específico)
+        matching_rules = []
+        for pattern, category in self.categorization_rules.items():
+            if pattern in description_upper:
+                matching_rules.append((pattern, category, len(pattern)))
+        
+        if matching_rules:
+            # Ordenar por longitud de patrón (descendente) y tomar el más largo
+            matching_rules.sort(key=lambda x: x[2], reverse=True)
+            return matching_rules[0][1]
+        
+        # Si no encuentra coincidencia, retornar vacío
+        return ''
     
     def extract_text_from_image(self, image_path):
         """Extrae texto de una imagen."""
@@ -191,6 +262,9 @@ class ExcelBankProcessor:
             amount, description, currency = self.extract_amount_and_description(line)
             
             if amount and description:
+                # Categorizar el movimiento
+                categoria = self.categorize_movement(description)
+                
                 movement = {
                     'descripcion': description,
                     'monto': amount,
@@ -198,9 +272,13 @@ class ExcelBankProcessor:
                     'fecha_completa': full_date,  # Para ordenamiento
                     'moneda_original': currency,  # Para separar USD y CLP
                     'forma_de_pago': 'Master (Santander Mariabe)',
-                    'categoria': ''
+                    'categoria': categoria
                 }
                 movements.append(movement)
+                
+                # Debug: mostrar categorización si se aplicó
+                if categoria:
+                    print(f"    📂 Categorizado como: {categoria}")
         
         return movements
     

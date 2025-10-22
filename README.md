@@ -11,6 +11,7 @@ Script automatizado para extraer movimientos bancarios de imágenes (capturas de
 - 🧹 **Limpieza inteligente** - Remueve códigos y caracteres no deseados
 - 📅 **Ordenamiento cronológico** - CLP primero, USD después para auditoría
 - 🔢 **Formato chileno** - Montos enteros, sin decimales
+- 🏷️ **Categorización automática** - Asigna categorías basadas en patrones configurables
 
 ## 📋 Requisitos
 
@@ -50,6 +51,12 @@ cp exchange_rates.properties.template exchange_rates.properties
 # Editar exchange_rates.properties con la tasa del día
 ```
 
+### 5. Configurar categorización (opcional)
+```bash
+cp categorization_rules.properties.template categorization_rules.properties
+# Editar categorization_rules.properties para personalizar las reglas
+```
+
 ## 🎯 Uso
 
 1. **Colocar imágenes** en la carpeta `to_process/`
@@ -69,7 +76,10 @@ bank-ocr-processor/
 ├── procesar_csv.py               # Script de uso simple
 ├── exchange_rates.properties     # Configuración de tasas (crear desde template)
 ├── exchange_rates.properties.template  # Plantilla de configuración
+├── categorization_rules.properties    # Reglas de categorización (crear desde template)
+├── categorization_rules.properties.template  # Plantilla de reglas
 ├── requirements.txt              # Dependencias Python
+├── CATEGORIZACION.md             # Documentación de categorización
 └── README.md                     # Este archivo
 ```
 
@@ -90,7 +100,7 @@ bank-ocr-processor/
 | `monto` | Valor en CLP (entero) | `15400` |
 | `dia` | Día del mes | `23` |
 | `forma_de_pago` | Forma de pago (fijo) | `Master (Santander Mariabe)` |
-| `categoria` | Categoría (vacío) | ` ` |
+| `categoria` | Categoría automática | `Medicinas` |
 
 ### Convenciones de signos:
 - **Positivo**: Gastos/Cargos
@@ -103,6 +113,17 @@ Editar `exchange_rates.properties`:
 ```properties
 USD_TO_CLP=950
 ```
+
+### Categorización Automática
+Editar `categorization_rules.properties`:
+```properties
+SB=Medicinas
+UBER=Transporte
+LIDER=Comida
+ENEL=Servicios
+```
+
+**Ver [CATEGORIZACION.md](CATEGORIZACION.md) para documentación completa de esta funcionalidad.**
 
 ### Montos
 - Los montos se convierten a **enteros** (formato chileno)

@@ -1,0 +1,93 @@
+# TEMPLATE - Reglas de Categorización para Movimientos Bancarios
+# ============================================================
+# 
+# Este archivo define patrones de texto que se buscan en las descripciones
+# de movimientos bancarios para asignar categorías automáticamente.
+#
+# FORMATO: PATRON=CATEGORIA
+# 
+# - Los patrones NO son case-sensitive (SB funciona igual que sb o Sb)
+# - Se busca el patrón como substring dentro de la descripción
+# - Primer patrón que coincida define la categoría
+# - Si no coincide ningún patrón, la categoría queda vacía
+#
+# CATEGORÍAS VÁLIDAS:
+# - Transporte
+# - Comida  
+# - Medicinas
+# - Servicios
+# - Otros
+# - Ingresos
+# - Autos
+# - N/A
+# - TAG
+# - sTechSolutions
+# - Extras
+# - Restaurantes
+# - Venezuela
+# - Creditos
+# - Arreglos
+# - Ahorros
+# - Pediatria SpA
+#
+# EJEMPLOS DE USO:
+# SB=Medicinas              # "SB 775" → Medicinas
+# UBER=Transporte           # "UBER VIAJE" → Transporte  
+# LIDER=Comida              # "COMPRA LIDER" → Comida
+# ENEL=Servicios            # "PAGO ENEL" → Servicios
+
+# === MEDICINAS Y SALUD ===
+SB=Medicinas
+SALCOBRAND=Medicinas
+FARMACIA=Medicinas
+CRUZ VERDE=Medicinas
+AHUMADA=Medicinas
+CLINICA=Medicinas
+HOSPITAL=Medicinas
+MEDICO=Pediatria SpA
+
+# === TRANSPORTE ===
+UBER=Transporte
+TAXI=Transporte
+METRO=Transporte
+BIP=Transporte
+TAG=TAG
+
+# === COMIDA Y SUPERMERCADOS ===
+LIDER=Comida
+JUMBO=Comida
+SANTA ISABEL=Comida
+UNIMARC=Comida
+TOTTUS=Comida
+SUPERMERCADO=Comida
+
+# === RESTAURANTES ===
+MCDONALDS=Restaurantes
+KFC=Restaurantes
+BURGER KING=Restaurantes
+PIZZA=Restaurantes
+RESTAURANT=Restaurantes
+
+# === SERVICIOS ===
+ENEL=Servicios
+AGUAS ANDINAS=Servicios
+VTR=Servicios
+MOVISTAR=Servicios
+ENTEL=Servicios
+
+# === AUTOS ===
+COPEC=Autos
+SHELL=Autos
+GASOLINA=Autos
+ESTACIONAMIENTO=Autos
+
+# === INGRESOS ===
+SUELDO=Ingresos
+DEPOSITO=Ingresos
+
+# === OTRAS CATEGORÍAS ===
+VENEZUELA=Venezuela
+CREDITO=Creditos
+AHORRO=Ahorros
+STECH=sTechSolutions
+REPARACION=Arreglos

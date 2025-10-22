@@ -69,3 +69,8 @@ exchange_rates.properties
 
 # Archivos de PyCharm
 .idea/
+
+# Archivos de prueba temporal
+test_*.py
+*_test.py
+RESUMEN_*.md
