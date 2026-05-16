@@ -6,6 +6,7 @@ Cada imagen = un día, primera línea tiene fecha, siguientes solo movimientos.
 
 import re
 import math
+import shutil
 from pathlib import Path
 from datetime import datetime
 import pandas as pd
@@ -22,6 +23,10 @@ class ExcelBankProcessor:
         self.output_folder = self.workspace / "processed"
         self.debug_folder = self.workspace / "ocr"
         
+        # Carpetas para archivos procesados
+        self.processed_images_folder = self.output_folder / "images"
+        self.processed_ocr_folder = self.output_folder / "ocr"
+        
         # Cargar tasa de cambio
         self.usd_to_clp = self.load_exchange_rate()
         
@@ -31,6 +36,8 @@ class ExcelBankProcessor:
         # Crear carpetas si no existen
         self.output_folder.mkdir(exist_ok=True)
         self.debug_folder.mkdir(exist_ok=True)
+        self.processed_images_folder.mkdir(exist_ok=True)
+        self.processed_ocr_folder.mkdir(exist_ok=True)
     
     def load_exchange_rate(self):
         """Carga la tasa de cambio desde el archivo properties."""
@@ -161,7 +168,8 @@ class ExcelBankProcessor:
     def extract_amount_and_description(self, line):
         """Extrae monto y descripción de una línea."""
         # Buscar montos en pesos chilenos ($) o dólares (USD)
-        peso_match = re.search(r'([+-])\$?([\d\.,]+)', line)
+        # Buscar primero el patrón más específico con $
+        peso_match = re.search(r'([+-])?\$\s*([\d\.,]+)', line)
         usd_match = re.search(r'([+-])?USD\s*([\d\.,]+)', line)
         
         amount = None
@@ -201,12 +209,25 @@ class ExcelBankProcessor:
             # Manejar formato chileno: puntos para miles
             if '.' in amount_str and not ',' in amount_str:
                 parts = amount_str.split('.')
-                if len(parts) == 2 and len(parts[1]) == 3:
-                    # Es formato de miles: 17.880 -> 17880
-                    amount_str = amount_str.replace('.', '')
-                    amount = int(amount_str)  # Entero, sin decimales
+                
+                # Verificar si es formato chileno de miles/millones
+                if len(parts) >= 2:
+                    # Verificar que todos los segmentos después del primero tengan 3 dígitos
+                    is_thousands_format = True
+                    for i in range(1, len(parts)):
+                        if len(parts[i]) != 3:
+                            is_thousands_format = False
+                            break
+                    
+                    if is_thousands_format:
+                        # Es formato de miles/millones: 1.200.000 -> 1200000
+                        amount_str = amount_str.replace('.', '')
+                        amount = int(amount_str)
+                    else:
+                        # Es decimal, redondear hacia arriba
+                        amount = math.ceil(float(amount_str))
                 else:
-                    # Es decimal, redondear hacia arriba
+                    # Solo hay un punto, podría ser decimal
                     amount = math.ceil(float(amount_str))
             else:
                 amount_str = amount_str.replace(',', '')
@@ -215,11 +236,11 @@ class ExcelBankProcessor:
             return None, None, None
         
         # Aplicar lógica bancaria:
-        # - Negativos (-$ o -USD) = gastos → positivos en CSV
+        # - Sin signo o Negativos (-$ o -USD) = gastos → positivos en CSV
         # - Positivos (+$ o +USD) = ingresos → negativos en CSV
         if sign == '+':
             amount = -amount  # Invertir signo para ingresos
-        # Si sign == '-', mantener positivo (ya es gasto)
+        # Si sign == '-' o None, mantener positivo (es gasto)
         
         # Extraer descripción (todo excepto monto)
         description = line
@@ -227,7 +248,7 @@ class ExcelBankProcessor:
         description = re.sub(r'[+-]?USD\s*[\d\.,]+', '', description)  # Quitar montos en dólares
         description = re.sub(r'\d{1,2}/\d{1,2}/\d{4}', '', description)  # Quitar fecha si hay
         description = re.sub(r'£\d*', '', description)  # Quitar códigos £ (con o sin números)
-        description = re.sub(r'\b(roy|poy|fay)\b\s*', '', description)  # Quitar prefijos comunes
+        description = re.sub(r'\b(roy|poy|fay|gg|cog)\b\s*', '', description, flags=re.IGNORECASE)  # Quitar prefijos comunes del OCR
         description = re.sub(r'^\|\s*', '', description)  # Quitar pipes al inicio
         description = re.sub(r'^[^\w\s]+', '', description)  # Quitar símbolos al inicio
         description = re.sub(r'[^\w\s]+$', '', description)  # Quitar símbolos al final
@@ -236,6 +257,10 @@ class ExcelBankProcessor:
         # Validar descripción
         if len(description) < 3:
             description = "Movimiento bancario"
+        
+        # Aplicar regla especial: NOTA DE CREDITO debe ser negativo
+        if 'NOTA DE CREDITO' in description.upper():
+            amount = -abs(amount)  # Forzar a negativo
         
         return amount, description, currency
     
@@ -285,11 +310,12 @@ class ExcelBankProcessor:
     def process_all_images(self):
         """Procesa todas las imágenes."""
         all_movements = []
+        processed_images = []
         
         png_files = list(self.input_folder.glob("*.png"))
         if not png_files:
             print("No se encontraron imágenes PNG")
-            return all_movements
+            return all_movements, processed_images
         
         print(f"Procesando {len(png_files)} imágenes...")
         
@@ -303,11 +329,15 @@ class ExcelBankProcessor:
             
             # Extraer movimientos
             movements = self.parse_movements_from_text(text)
-            all_movements.extend(movements)
             
-            print(f"  → {len(movements)} movimientos encontrados")
+            if movements:  # Solo agregar a procesadas si encontró movimientos
+                all_movements.extend(movements)
+                processed_images.append(image_path)
+                print(f"  → {len(movements)} movimientos encontrados")
+            else:
+                print(f"  → No se encontraron movimientos válidos")
         
-        return all_movements
+        return all_movements, processed_images
     
     def save_to_excel(self, movements):
         """Guarda los movimientos en Excel."""
@@ -348,15 +378,78 @@ class ExcelBankProcessor:
         
         return excel_file
     
+    def move_processed_files(self, processed_images):
+        """Mueve archivos procesados a las carpetas correspondientes."""
+        print("\n📁 Organizando archivos procesados...")
+        
+        # Contador de archivos movidos
+        images_moved = 0
+        ocr_moved = 0
+        
+        # 1. Mover imágenes procesadas
+        if processed_images:
+            print(f"  📸 Moviendo {len(processed_images)} imágenes procesadas...")
+            for image_path in processed_images:
+                if image_path.exists():
+                    try:
+                        destination = self.processed_images_folder / image_path.name
+                        shutil.move(str(image_path), str(destination))
+                        images_moved += 1
+                        print(f"    ✓ {image_path.name} → processed/images/")
+                    except Exception as e:
+                        print(f"    ❌ Error moviendo {image_path.name}: {e}")
+        
+        # 2. Mover archivos OCR correspondientes
+        ocr_files = list(self.debug_folder.glob("*.txt"))
+        if ocr_files:
+            print(f"  📄 Moviendo {len(ocr_files)} archivos OCR...")
+            for ocr_file in ocr_files:
+                try:
+                    destination = self.processed_ocr_folder / ocr_file.name
+                    shutil.move(str(ocr_file), str(destination))
+                    ocr_moved += 1
+                    print(f"    ✓ {ocr_file.name} → processed/ocr/")
+                except Exception as e:
+                    print(f"    ❌ Error moviendo {ocr_file.name}: {e}")
+        
+        # Resumen
+        print(f"\n📋 Resumen de archivos organizados:")
+        print(f"  📸 Imágenes movidas: {images_moved}")
+        print(f"  📄 Archivos OCR movidos: {ocr_moved}")
+        
+        # Verificar que las carpetas estén vacías
+        remaining_images = list(self.input_folder.glob("*.png"))
+        remaining_ocr = list(self.debug_folder.glob("*.txt"))
+        
+        if not remaining_images and not remaining_ocr:
+            print(f"  ✅ Carpetas 'to_process' y 'ocr' están ahora vacías")
+        else:
+            if remaining_images:
+                print(f"  ⚠️  Quedan {len(remaining_images)} imágenes en 'to_process'")
+            if remaining_ocr:
+                print(f"  ⚠️  Quedan {len(remaining_ocr)} archivos OCR en 'ocr'")
+    
+    def cleanup_empty_directories(self):
+        """Limpia directorios que puedan haber quedado vacíos (opcional)."""
+        pass  # Por ahora no eliminamos las carpetas, solo las dejamos vacías
+    
     def run(self):
         """Ejecuta el proceso completo."""
         print("=== Procesador Excel de Movimientos Bancarios ===")
         
-        movements = self.process_all_images()
+        movements, processed_images = self.process_all_images()
         
         if movements:
             print(f"\nTotal: {len(movements)} movimientos")
             excel_file = self.save_to_excel(movements)
+            
+            # Si se creó el Excel exitosamente, mover archivos procesados
+            if excel_file:
+                self.move_processed_files(processed_images)
+                print(f"\n🎉 Proceso completado exitosamente!")
+                print(f"   📊 Excel: {excel_file.name}")
+                print(f"   📁 Archivos organizados en 'processed/'")
+            
             return excel_file
         else:
             print("No se encontraron movimientos")
@@ -366,7 +459,12 @@ class ExcelBankProcessor:
 def main():
     """Función principal."""
     processor = ExcelBankProcessor()
-    processor.run()
+    result = processor.run()
+    
+    if result:
+        print(f"\n✅ Proceso completado. Archivo Excel: {result.name}")
+    else:
+        print("\n❌ No se pudo completar el procesamiento")
 
 
 if __name__ == "__main__":

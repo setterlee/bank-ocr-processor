@@ -12,6 +12,7 @@ Script automatizado para extraer movimientos bancarios de imágenes (capturas de
 - 📅 **Ordenamiento cronológico** - CLP primero, USD después para auditoría
 - 🔢 **Formato chileno** - Montos enteros, sin decimales
 - 🏷️ **Categorización automática** - Asigna categorías basadas en patrones configurables
+- 📁 **Organización automática** - Mueve archivos procesados y deja carpetas listas para el siguiente procesamiento
 
 ## 📋 Requisitos
 
@@ -41,7 +42,13 @@ sudo apt install tesseract-ocr
 ### 3. Crear entorno virtual e instalar dependencias
 ```bash
 python3 -m venv venv
-source venv/bin/activate  # En Windows: venv\Scripts\activate
+
+# Activar entorno virtual
+source venv/bin/activate           # bash/zsh
+# o
+source venv/bin/activate.fish      # fish shell
+# En Windows: venv\Scripts\activate
+
 pip install -r requirements.txt
 ```
 
@@ -62,16 +69,28 @@ cp categorization_rules.properties.template categorization_rules.properties
 1. **Colocar imágenes** en la carpeta `to_process/`
 2. **Ejecutar el procesador**:
    ```bash
+   # Asegurate de tener el entorno virtual activado
+   source venv/bin/activate.fish  # o source venv/bin/activate
    python3 procesar_csv.py
    ```
-3. **Revisar Excel** generado en `processed/`
+3. **Revisar resultados**:
+   - ✅ **Excel** generado en `processed/`
+   - 📸 **Imágenes procesadas** movidas a `processed/images/`
+   - 📄 **Archivos OCR** movidas a `processed/ocr/`
+   - 🎯 **Carpetas `to_process/` y `ocr/`** quedan vacías y listas para el siguiente procesamiento
 
 ## 📁 Estructura del Proyecto
 
 ```
 bank-ocr-processor/
-├── to_process/                    # Imágenes PNG a procesar
-├── processed/                     # Archivos Excel generados
+├── to_process/                    # Imágenes PNG a procesar (se vacía después de cada ejecución)
+├── ocr/                          # Archivos OCR temporales (se vacía después de cada ejecución)  
+├── processed/                    # Archivos procesados organizados
+│   ├── movimientos_YYYYMMDD_HHMMSS.xlsx  # Archivos Excel generados
+│   ├── images/                   # Imágenes procesadas
+│   │   └── *.png                 # Capturas procesadas movidas aquí
+│   └── ocr/                      # Archivos OCR procesados
+│       └── *.txt                 # Textos extraídos movidos aquí
 ├── csv_processor.py              # Procesador principal
 ├── procesar_csv.py               # Script de uso simple
 ├── exchange_rates.properties     # Configuración de tasas (crear desde template)
@@ -132,12 +151,17 @@ ENEL=Servicios
 
 ## 🔄 Proceso de Conversión
 
-1. **OCR**: Extrae texto de cada imagen
+1. **OCR**: Extrae texto de cada imagen y guarda archivos `.txt` en `ocr/`
 2. **Parsing**: Identifica fechas, descripciones y montos
 3. **Limpieza**: Remueve códigos y caracteres no deseados
 4. **Conversión**: USD → CLP según tasa configurada
-5. **Ordenamiento**: CLP primero (cronológico), USD después (cronológico)
-6. **Export**: Genera Excel con formato estándar
+5. **Categorización**: Aplica reglas automáticas de categorización
+6. **Ordenamiento**: CLP primero (cronológico), USD después (cronológico)
+7. **Export**: Genera Excel con formato estándar en `processed/`
+8. **Organización**: Mueve automáticamente:
+   - ✅ Imágenes procesadas → `processed/images/`
+   - ✅ Archivos OCR → `processed/ocr/`
+   - ✅ Deja `to_process/` y `ocr/` vacías para el siguiente procesamiento
 
 ## �️ Desarrollo
 
